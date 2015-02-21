@@ -17,12 +17,11 @@ QT += core dbus
 QT -= gui
 
 LIBS = -llipstick-qt5
-#INCLUDEPATH += $$[QT_HOST_PREFIX]/include/lipstick-qt5
-INCLUDEPATH += /usr/include/lipstick-qt5
+#INCLUDEPATH += /usr/include/lipstick-qt5
+INCLUDEPATH += $$[QT_HOST_PREFIX]/include/lipstick-qt5
 
 target.path = /usr/bin
 INSTALLS += target
-
 
 SOURCES += \
     src/main.cpp \
@@ -30,16 +29,7 @@ SOURCES += \
 
 OTHER_FILES += rpm/lipstick-notification-manager.changes.in \
     rpm/lipstick-notification-manager.spec \
-    rpm/lipstick-notification-manager.yaml \
-    translations/*.ts
-
-OTHER_FILES += $$files(rpm/*)
-
-# to disable building translations every time, comment out the
-# following CONFIG line
-#CONFIG += sailfishapp_i18n
-#TRANSLATIONS += translations/lipstick-notification-manager-de.ts
+    rpm/lipstick-notification-manager.yaml
 
 HEADERS += \
     src/application.h
-
