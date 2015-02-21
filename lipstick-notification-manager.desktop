@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+X-Nemo-Application-Type=silica-qt5
+Icon=lipstick-notification-manager
+Exec=lipstick-notification-manager
+Name=lipstick-notification-manager
+# translation example:
+# your app name in German locale (de)
+Name[de]=lipstick-notification-manager
+
