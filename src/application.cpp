@@ -18,7 +18,73 @@ Application::~Application()
     delete(this->model);
 }
 
-QString Application::parseStringList(const QStringList list)
+void Application::listPlaceholders()
+{
+    QTextStream cout(stdout);
+
+    QMap<QString, QString> placeholders = this->getPlaceholders();
+    QMapIterator<QString, QString> iterator(placeholders);
+
+    cout << "Available placeholders:" << endl;
+
+    int maxPlayceholderWidth = 0;
+
+    while (iterator.hasNext()) {
+        iterator.next();
+
+        int width = iterator.key().length();
+
+        if (width > maxPlayceholderWidth)
+            maxPlayceholderWidth = width;
+    }
+
+    iterator.toFront();
+
+    while (iterator.hasNext()) {
+        iterator.next();
+
+        QString placeHolder = iterator.key();
+        QString fieldName = iterator.value();
+
+        cout << "  " << QString(placeHolder + ":").leftJustified(maxPlayceholderWidth + 2) << fieldName << endl;
+    }
+}
+
+uint Application::getNotificationId(const LipstickNotification *notification) const
+{
+    QList<uint> ids = NotificationManager::instance()->notificationIds();
+
+    foreach(uint id, ids) {
+        LipstickNotification *n = NotificationManager::instance()->notification(id);
+
+        if (n == notification)
+            return id;
+    }
+
+    return -1;
+}
+
+QMap<QString, QString> Application::getPlaceholders() const
+{
+    QMap<QString, QString> placeholders;
+
+    placeholders["an"] = "appName";
+    placeholders["s"] = "summary";
+    placeholders["b"] = "body";
+    placeholders["cnt"] = "itemCount";
+    placeholders["id"] = "id";
+    placeholders["ps"] = "previewSummary";
+    placeholders["pb"] = "previewBody";
+    placeholders["e"] = "expireTimeout";
+    placeholders["ts"] = "timestamp";
+    placeholders["u"] = "urgency";
+    placeholders["py"] = "priority";
+    placeholders["cat"] = "category";
+
+    return placeholders;
+}
+
+QString Application::parseStringList(const QStringList list) const
 {
     QString result = QStringLiteral("[");
 
@@ -33,7 +99,7 @@ QString Application::parseStringList(const QStringList list)
     return result;
 }
 
-QString Application::parseVariantHash(const QVariantHash hash)
+QString Application::parseVariantHash(const QVariantHash hash) const
 {
     QString result = QStringLiteral("[");
 
@@ -49,55 +115,31 @@ QString Application::parseVariantHash(const QVariantHash hash)
     return result;
 }
 
-void Application::list(QString format)
+void Application::listNotifications(QString format)
 {
-    // somewhere control characters are escaped... so hack this...
-    format = format.replace("\\n", QChar(QChar::LineFeed));
-    format = format.replace("\\t", QChar(QChar::Tabulation));
-
-    QHash<QString, QString> placeholders;
-    placeholders["an"] = "appName";
-    placeholders["s"] = "summary";
-    placeholders["b"] = "body";
-    placeholders["cnt"] = "itemCount";
-    placeholders["i"] = "id";
-    placeholders["ps"] = "previewSummary";
-    placeholders["pb"] = "previewBody";
-    placeholders["e"] = "expireTimeout";
-    placeholders["ts"] = "timestamp";
-    placeholders["u"] = "urgency";
-    placeholders["py"] = "priority";
-    placeholders["cat"] = "category";
-
-    //NotificationManager *m = NotificationManager::instance();
-    //NotificationListModel *model = new NotificationListModel();
-
-
-    //QList<uint> ids = m->notificationIds();
-
     QTextStream cout(stdout);
 
     QList<LipstickNotification*> *list = this->model->getList<LipstickNotification>();
 
-    qDebug() << "Count Model:" << this->model->itemCount();
-    qDebug() << "Count QObject:" << this->model->getList()->count();
-    qDebug() << "Count LipstickNotification:" << list->count();
-
-    //foreach (LipstickNotification &notification, list) {
     for (int i=0; i<list->count(); i++) {
+        LipstickNotification *notification = list->at(i);
         QString notificationText = format;
 
-        LipstickNotification *notification = list->at(i);
-        //QMetaObject metaObject = notification->metaObject();
+        QMap<QString, QString> placeholders = this->getPlaceholders();
+        QMapIterator<QString, QString> iterator(placeholders);
 
-        QHashIterator<QString, QString> i(placeholders);
-        while (i.hasNext()) {
-            i.next();
+        while (iterator.hasNext()) {
+            iterator.next();
 
-            QString placeHolder = i.key();
-            QString fieldName = i.value();
+            QString placeHolder = iterator.key();
+            QString fieldName = iterator.value();
 
-            QVariant fieldValue = notification->property(fieldName.toLocal8Bit().constData());
+            QVariant fieldValue;
+
+            if (fieldName == "id")
+                fieldValue = QVariant(this->getNotificationId(notification));
+            else
+                fieldValue = notification->property(fieldName.toLocal8Bit().constData());
 
             bool hasValue = fieldValue.isValid();
 
@@ -110,15 +152,23 @@ void Application::list(QString format)
                 case QVariant::Int:
                     hasValue = fieldValue.value<int>() != 0;
                     break;
+
+                case QVariant::UInt:
+                    hasValue = fieldValue.value<uint>() != 0;
+                    break;
+
+                default:
+                    // hide warnings
+                    break;
                 }
             }
 
-            notificationText = notificationText.replace("%" + placeHolder + "?", hasValue ? fieldValue.toString() : "");
-            notificationText = notificationText.replace("%" + placeHolder, fieldValue.toString());
+            notificationText.replace("%" + placeHolder + "?", hasValue ? fieldValue.toString() : "");
+            notificationText.replace("%" + placeHolder, fieldValue.toString());
         }
 
-        notificationText = notificationText.replace("%h", this->parseVariantHash(notification->hints()));
-        notificationText = notificationText.replace("%act", this->parseStringList(notification->actions()));
+        notificationText.replace("%h", this->parseVariantHash(notification->hints()));
+        notificationText.replace("%act", this->parseStringList(notification->actions()));
 
         cout << notificationText;
     }
@@ -131,18 +181,21 @@ void Application::run()
     p.addHelpOption();
     p.addVersionOption();
 
-    p.addPositionalArgument("command", "command to execute:\n   list, notify*, delete*\n   if not specified, 'list' is used\n   * not implemented yet");
+    p.addPositionalArgument("command", "command to execute:\n   list, add*, delete*\n   if not specified, 'list' is used\n   * not implemented yet");
 
     QCommandLineOption formatOption(QStringList() << "f" << "format", "Specifies the format of the output when using the list-command.", "format", "%an - %cnt %s\n%b\n\n");
     p.addOption(formatOption);
 
-    QCommandLineOption rawOption(QStringList() << "a" << "all", "Prints all fields");
+    QCommandLineOption rawOption("raw", "Prints all fields");
     p.addOption(rawOption);
+
+    QCommandLineOption idOption("id", "Set the notification id", "id");
+    p.addOption(idOption);
 
     p.process(*this);
 
     QStringList availableCommands;
-    availableCommands << "list" << "notify" << "delete";
+    availableCommands << "list" << "add" << "delete" << "placeholders";
 
     QString command = p.positionalArguments().value(0).trimmed().toLower();
 
@@ -161,7 +214,7 @@ void Application::run()
                     "summary:\t\t%s\n"
                     "body:\t\t\t%b\n"
                     "itemCount:\t\t%cnt\n"
-                    "id:\t\t%i\n"
+                    "id:\t\t%id\n"
                     "previewSummary:\t\t%ps\n"
                     "previewBody:\t\t%pb\n"
                     "expireTimeout:\t\t%e\n"
@@ -175,10 +228,19 @@ void Application::run()
         else
             format = p.value(formatOption);
 
-        this->list(format);
-        this->exit();
+        // somewhere control characters are escaped... so hack this...
+        format = format.replace("\\n", QChar(QChar::LineFeed));
+        format = format.replace("\\t", QChar(QChar::Tabulation));
+
+        this->listNotifications(format);
+    } else if (command == "placeholders") {
+        this->listPlaceholders();
     } else {
         QTextStream(stderr) << "command '" << command << "' is not implemeneted yet." << endl;
+
         this->exit(1);
+        return;
     }
+
+    this->exit();
 }

@@ -2,7 +2,9 @@
 #define APPLICATION_H
 
 #include <QCoreApplication>
+#include <QMap>
 
+class LipstickNotification;
 class NotificationListModel;
 class QCommandLineParser;
 
@@ -14,9 +16,15 @@ public:
     ~Application();
 
 private:
-    void list(const QString format);
-    QString parseVariantHash(const QVariantHash hash);
-    QString parseStringList(const QStringList list);
+    void listNotifications(const QString format);
+    void listPlaceholders();
+
+    QString parseVariantHash(const QVariantHash hash) const;
+    QString parseStringList(const QStringList list) const;
+
+    QMap<QString, QString> getPlaceholders() const;
+
+    uint getNotificationId(const LipstickNotification *notification) const;
 
 signals:
 
